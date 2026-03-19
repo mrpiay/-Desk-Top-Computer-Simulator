@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>The Desk-Top Living Computer Simulator</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 { text-align: center; color: #667eea; margin-bottom: 10px; font-size: 2.5em; }
+        .subtitle { text-align: center; color: #666; margin-bottom: 30px; font-size: 1.1em; }
+        .workspace { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-bottom: 30px; }
+        .section { background: #f8f9fa; padding: 20px; border-radius: 15px; border: 3px solid #e9ecef; }
+        .full-width { grid-column: 1 / -1; }
+        .section-title {
+            font-size: 1.5em; color: #495057; margin-bottom: 15px; font-weight: bold; text-align: center;
+            padding: 10px; background: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .section-title.bottom { margin-bottom: 0; margin-top: 15px; }
+        .desk-grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 15px; }
+        .desk {
+            background: white; border: 3px solid #dee2e6; border-radius: 12px; padding: 15px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1); transition: all 0.3s ease;
+        }
+        .desk.active {
+            border-color: #28a745; background: #d4edda; transform: scale(1.05);
+            box-shadow: 0 6px 20px rgba(40, 167, 69, 0.3);
+        }
+
+
+        .desk.error {
+            border-color: #dc3545 !important;
+            background-color: #f8d7da !important;
+            transform: scale(1.05);
+        }
+
+
+        .desk-label { font-weight: bold; color: gray; margin-bottom: 8px; font-size: 1.1em; }
+        .input-label { text-align: right; }
+        .output-label { text-align: left; }
+        .desk input {
+            width: 100%; padding: 10px; border: 2px solid #ced4da; border-radius: 8px;
+            font-size: 1.5em; font-family: 'Courier New', monospace; text-align: center; font-weight: bold;
+        }
+        .desk input:focus { outline: none; border-color: #667eea; box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1); }
+        .cpu-section { grid-column: 1 / -1; }
+        .cpu-desk { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; padding: 15px; text-align: center; }
+        .cpu-desk .desk-label { color: white; font-size: 1.3em; margin-bottom: 10px; }
+        .cpu-value {
+            font-size: 1.3em; font-weight: bold; font-family: 'Courier New', monospace;
+            background: rgba(255,255,255,0.2); padding: 10px; border-radius: 8px; backdrop-filter: blur(10px);
+            min-height: 1.5em;
+        }
+        .io-section { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; grid-column: 1 / -1; }
+        .control-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; grid-column: 1 / -1; }
+        .io-desk { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; border: none; }
+        .io-desk .desk-label { color: white; font-size: 1.3em; }
+        .io-desk input { background: rgba(255,255,255,0.9); font-size: 1.3em; font-weight: bold; }
+        .controls { display: flex; justify-content: center; gap: 15px; margin-top: 30px; flex-wrap: wrap; }
+        .controls-primary { display: flex; justify-content: center; gap: 15px; margin-top: 30px; flex-wrap: wrap; }
+        .controls-secondary { display: flex; justify-content: center; gap: 15px; margin-top: 15px; flex-wrap: wrap; }
+        .btn { padding: 15px 35px; font-size: 1.1em; font-weight: bold; border: none; border-radius: 10px; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0,0,0,0.3); }
+        .btn:active { transform: translateY(0); }
+        .btn-run { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+        .btn-step { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; }
+        .btn-reset { background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%); color: #333; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+.section.highlight {
+    border: 3px solid #28a745;           /* same as desk.active */
+    border-radius: 12px;
+    box-shadow: 0 6px 20px rgba(40, 167, 69, 0.3); /* same as desk.active */
+    background: rgba(40, 167, 69, 0.1);  /* translucent green overlay */
+    transition: all 0.3s ease;
+}
+
+.btn-example {
+    background: linear-gradient(135deg, #28a745 0%, #71dd8a 100%);
+    color: white;
+}
+.btn-example:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(40, 167, 69, 0.3);
+}
+.btn-example:active {
+    transform: translateY(0);
+}
+
+.btn-new {
+    background: linear-gradient(135deg, #007bff 0%, #66b2ff 100%);
+    color: white;
+}
+.btn-new:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0, 123, 255, 0.3);
+}
+.btn-new:active {
+    transform: translateY(0);
+}
+
+.btn-speed {
+    background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%);
+    color: white;
+    min-width: 180px;
+}
+.btn-speed:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(255, 193, 7, 0.3);
+}
+.btn-speed:active {
+    transform: translateY(0);
+}
+.btn-speed.fast {
+    background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+}
+.btn-speed.superfast {
+    background: linear-gradient(135deg, #9c27b0 0%, #e91e63 100%);
+}
+.btn-speed.ultrafast {
+    background: linear-gradient(135deg, #1a237e 0%, #0097a7 100%);
+}
+
+.btn-bus {
+    background: linear-gradient(135deg, #ffd700 0%, #ffb300 100%);
+    color: #333;
+    min-width: 160px;
+}
+.btn-bus:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(255, 215, 0, 0.3);
+}
+.btn-bus:active {
+    transform: translateY(0);
+}
+.btn-bus.hidden {
+    background: linear-gradient(135deg, #ffe082 0%, #ffd54f 100%);
+    opacity: 0.7;
+}
+
+
+        .status { text-align: center; margin-top: 20px; padding: 15px; background: #e9ecef; border-radius: 10px; font-size: 1.1em; color: #495057; font-weight: bold; }
+        .status.running { background: #d4edda; color: #155724; }
+        .status.error { background: #f8d7da; color: #721c24; }
+        .help { margin-top: 30px; padding: 20px; background: #fff3cd; border-radius: 10px; border-left: 5px solid #ffc107; }
+        .help h3 { color: #856404; margin-bottom: 10px; }
+        .help ul { margin-left: 20px; color: #856404; }
+        .help li { margin: 5px 0; }
+        .help code { background: #fff; padding: 2px 6px; border-radius: 4px; font-family: 'Courier New', monospace; }
+        
+        /* Connection lines */
+        .connections-svg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+            transition: opacity 0.3s ease;
+        }
+        .connections-svg.hidden {
+            opacity: 0;
+        }
+        .workspace {
+            position: relative;
+        }
+        .connection-line {
+            stroke: #667eea;
+            stroke-width: 2;
+            fill: none;
+            opacity: 0.3;
+            transition: all 0.3s ease;
+        }
+        .connection-line.active {
+            stroke: #28a745;
+            stroke-width: 3;
+            opacity: 0.8;
+            animation: pulse 1s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 0.8; }
+            50% { opacity: 0.4; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🖥️ The Desk-Top Living Computer Simulator</h1>
+        <p class="subtitle">Edit the desks and run your program!</p>
+
+        <div class="workspace">
+            <svg class="connections-svg hidden" id="connectionsSvg"></svg>
+            <!-- Instructions Section -->
+            <div class="section full-width">
+                <div class="section-title">📋 INSTRUCTION DESKS (0-9)</div>
+                <div class="desk-grid">
+                    <div class="desk" id="inst0"><div class="desk-label">0</div><input type="text" data-desk="inst0"></div>
+                    <div class="desk" id="inst1"><div class="desk-label">1</div><input type="text" data-desk="inst1"></div>
+                    <div class="desk" id="inst2"><div class="desk-label">2</div><input type="text" data-desk="inst2"></div>
+                    <div class="desk" id="inst3"><div class="desk-label">3</div><input type="text" data-desk="inst3"></div>
+                    <div class="desk" id="inst4"><div class="desk-label">4</div><input type="text" data-desk="inst4"></div>
+                    <div class="desk" id="inst5"><div class="desk-label">5</div><input type="text" data-desk="inst5"></div>
+                    <div class="desk" id="inst6"><div class="desk-label">6</div><input type="text" data-desk="inst6"></div>
+                    <div class="desk" id="inst7"><div class="desk-label">7</div><input type="text" data-desk="inst7"></div>
+                    <div class="desk" id="inst8"><div class="desk-label">8</div><input type="text" data-desk="inst8"></div>
+                    <div class="desk" id="inst9"><div class="desk-label">9</div><input type="text" data-desk="inst9"></div>
+                </div>
+            </div>
+
+            <!-- CPU and Input/Output Section -->
+            <div class="control-row">
+                <div class="section">
+                    <div class="desk io-desk">
+                        <div class="desk-label input-label">INPUT DESK ➡️</div>
+                        <input type="text" id="inputDesk">
+                    </div>
+                </div>
+                <div class="section">
+                    <div class="desk cpu-desk">
+                        <div class="desk-label">CPU DESK</div>
+                        <div class="cpu-value" id="cpuValue">&nbsp;</div>
+                    </div>
+                </div>
+                <div class="section">
+                    <div class="desk io-desk">
+                        <div class="desk-label output-label">➡️ OUTPUT DESK</div>
+                        <input type="text" id="outputDesk" readonly>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Data Section -->
+            <div class="section full-width">
+                <div class="desk-grid">
+                    <div class="desk" id="data0"><div class="desk-label">0</div><input type="text" data-desk="data0"></div>
+                    <div class="desk" id="data1"><div class="desk-label">1</div><input type="text" data-desk="data1"></div>
+                    <div class="desk" id="data2"><div class="desk-label">2</div><input type="text" data-desk="data2"></div>
+                    <div class="desk" id="data3"><div class="desk-label">3</div><input type="text" data-desk="data3"></div>
+                    <div class="desk" id="data4"><div class="desk-label">4</div><input type="text" data-desk="data4"></div>
+                    <div class="desk" id="data5"><div class="desk-label">5</div><input type="text" data-desk="data5"></div>
+                    <div class="desk" id="data6"><div class="desk-label">6</div><input type="text" data-desk="data6"></div>
+                    <div class="desk" id="data7"><div class="desk-label">7</div><input type="text" data-desk="data7"></div>
+                    <div class="desk" id="data8"><div class="desk-label">8</div><input type="text" data-desk="data8"></div>
+                    <div class="desk" id="data9"><div class="desk-label">9</div><input type="text" data-desk="data9"></div>
+                </div>
+                <div class="section-title bottom">🗃️ DATA DESKS (0-9)</div>
+            </div>
+        </div>
+
+        <div class="controls-primary">
+            <button class="btn btn-run" id="runBtn">▶️ Run Program</button>
+            <button class="btn btn-step" id="stepBtn">⏭️ Step</button>
+            <button class="btn btn-reset" id="resetBtn">🔄 Reset</button>
+            <button class="btn btn-new" id="newBtn">✨ New</button>
+        </div>
+
+        <div class="controls-secondary">
+            <button class="btn btn-speed" id="speedBtn">🐢 Normal Speed</button>
+            <button class="btn btn-bus hidden" id="busBtn">🔌 Show Wires</button>
+            <button class="btn btn-example" id="loadExampleBtn">📂 Load Example Program</button>
+        </div>
+
+        <div class="status" id="status">Ready to run.</div>
+
+        <div class="help">
+            <h3>📖 Quick Reference - Instruction Codes:</h3>
+            <ul>
+                <li><code>0 X</code> - Set teacher's value to data desk X value</li>
+                <li><code>1 X</code> - Add value from data desk X to teacher's value</li>
+                <li><code>2 X</code> - Subtract value from data desk X from teacher's value</li>
+                <li><code>3 X</code> - Set data desk X value to teacher's value</li>
+                <li><code>4 X</code> - Jump to instruction desk X</li>
+                <li><code>5 X</code> - Jump to instruction desk X if teacher's value = 0</li>
+                <li><code>6 X</code> - Jump to instruction desk X if teacher's value < 0</li>
+                <li><code>7</code> - Set teacher's value to Input desk value</li>
+                <li><code>8</code> - Set Output desk value to teacher's value</li>
+                <li><code>9</code> - End program</li>
+            </ul>
+        </div>
+    </div>
+
+<script>
+let cpu = '';
+let programCounter = 0;
+let running = false;
+let instructions = new Array(10).fill('');
+let data = new Array(10).fill('');
+let inputValues = [];
+let inputIndex = 0;
+let outputValues = [];
+let speedMode = 'normal'; // 'normal', 'fast', 'superfast', or 'ultrafast'
+
+const cpuDisplay = document.getElementById('cpuValue');
+const statusDisplay = document.getElementById('status');
+const runBtn = document.getElementById('runBtn');
+const stepBtn = document.getElementById('stepBtn');
+const resetBtn = document.getElementById('resetBtn');
+const inputDesk = document.getElementById('inputDesk');
+const outputDesk = document.getElementById('outputDesk');
+const speedBtn = document.getElementById('speedBtn');
+const busBtn = document.getElementById('busBtn');
+let connections = [];
+let busLinesVisible = false;
+
+function sleep(ms) {
+    let actualMs = ms;
+    if (speedMode === 'fast') actualMs = ms / 2;
+    else if (speedMode === 'superfast') actualMs = ms / 4;
+    else if (speedMode === 'ultrafast') actualMs = ms / 8;
+    return new Promise(resolve => setTimeout(resolve, actualMs));
+}
+
+function updateStatus(message, type = 'normal') {
+    statusDisplay.textContent = message;
+    statusDisplay.className = 'status';
+    document.querySelectorAll('.desk').forEach(d => d.classList.remove('error'));
+
+    if (type === 'running') statusDisplay.classList.add('running');
+    if (type === 'error') {
+        statusDisplay.classList.add('error');
+        highlightErrorDesk(programCounter);
+    }
+}
+
+function updateCPU() {
+    cpuDisplay.innerHTML = cpu === '' ? '&nbsp;' : cpu;
+}
+
+function parseInputValues() {
+    const inputText = inputDesk.value.trim();
+    inputValues = inputText ? inputText.split(',').map(v => v.trim()).filter(v => v !== '').reverse() : [];
+    inputIndex = 0;
+}
+
+function updateOutputDisplay() {
+    outputDesk.value = outputValues.join(', ');
+}
+
+// Highlight functions
+function highlightInstructionDesk(num) {
+    document.querySelectorAll('.desk[id^="inst"]').forEach(d => d.classList.remove('active'));
+    const el = document.getElementById(`inst${num}`);
+    if (el) el.classList.add('active');
+    highlightConnection(`inst${num}`);
+}
+
+function highlightDataDesk(num) {
+    // Clear previous data highlights
+    document.querySelectorAll('[id^="data"]').forEach(d => d.classList.remove('active'));
+
+    // Highlight the current one
+    const el = document.getElementById(`data${num}`);
+    if (el) el.classList.add('active');
+    highlightConnection(`data${num}`);
+}
+
+function clearDataHighlights() {
+    document.querySelectorAll('[id^="data"]').forEach(d => d.classList.remove('active'));
+}
+
+
+function highlightCPU() {
+    document.querySelectorAll('.desk').forEach(d => {
+        if (!d.id.startsWith('inst') && !d.classList.contains('io-desk')) d.classList.remove('active');
+    });
+document.querySelector('#cpuValue').closest('.section').classList.add('highlight');
+}
+
+function highlightInputDesk() {
+    document.querySelectorAll('.desk').forEach(d => {
+        if (!d.id.startsWith('inst') && !d.id.includes('cpu')) d.classList.remove('active');
+    });
+document.querySelector('#inputDesk').closest('.section').classList.add('highlight');
+highlightConnection('input');
+}
+
+function highlightOutputDesk() {
+    document.querySelectorAll('.desk').forEach(d => {
+        if (!d.id.startsWith('inst') && !d.id.includes('cpu')) d.classList.remove('active');
+    });
+document.querySelector('#outputDesk').closest('.section').classList.add('highlight');
+highlightConnection('output');
+}
+
+function clearTransientHighlights() {
+    document.querySelectorAll('.section.highlight, .section.highlight-strong')
+            .forEach(s => s.classList.remove('highlight'));
+    clearConnectionHighlights();
+}
+
+
+function highlightErrorDesk(deskNum) {
+    if (deskNum >= 0 && deskNum <= 9) {
+        const el = document.getElementById(`inst${deskNum}`);
+        if (el) el.classList.add('error');
+    }
+}
+
+function readMemory() {
+    document.querySelectorAll('input[data-desk]').forEach(input => {
+        const deskId = input.getAttribute('data-desk');
+        if (deskId.startsWith('inst')) {
+            const num = parseInt(deskId.replace('inst', ''));
+            instructions[num] = input.value.trim();
+        } else if (deskId.startsWith('data')) {
+            const num = parseInt(deskId.replace('data', ''));
+            data[num] = input.value.trim();
+        }
+    });
+}
+
+function writeMemory() {
+    document.querySelectorAll('input[data-desk]').forEach(input => {
+        const deskId = input.getAttribute('data-desk');
+        if (deskId.startsWith('data')) {
+            const num = parseInt(deskId.replace('data', ''));
+            input.value = data[num];
+        }
+    });
+}
+
+function parseInstruction(instruction) {
+    const parts = instruction.trim().split(/\s+/);
+    const opcode = parseInt(parts[0]);
+    const operand = parts.length > 1 ? parseInt(parts[1]) : null;
+    return { opcode, operand };
+}
+
+async function highlightTemp(elFunc, duration = 500) {
+    elFunc();
+    await sleep(duration);
+    clearTransientHighlights();
+}
+
+async function executeStep() {
+    if (programCounter < 0 || programCounter > 9) {
+        updateStatus('Error: Program counter out of bounds!', 'error');
+        running = false;
+        return false;
+    }
+
+    highlightInstructionDesk(programCounter);
+    await sleep(1500); // instruction desk visible
+
+    const instruction = instructions[programCounter];
+    if (!instruction) {
+        updateStatus('Error: Empty instruction at Instruction ' + programCounter, 'error');
+        running = false;
+        return false;
+    }
+
+    const { opcode, operand } = parseInstruction(instruction);
+
+    switch(opcode) {
+        case 0: // Load
+            if (operand === null || operand < 0 || operand > 9) { updateStatus('Error: Invalid operand for 0', 'error'); running=false; return false; }
+            if (!data[operand] || data[operand].trim() === '') { updateStatus(`Error: Data ${operand} empty`, 'error'); running=false; return false; }
+            const loadValue = parseInt(data[operand]);
+            if (isNaN(loadValue)) { updateStatus(`Error: Data ${operand} invalid`, 'error'); running=false; return false; }
+            await highlightTemp(() => highlightDataDesk(operand));
+            cpu = loadValue;
+            await highlightTemp(highlightCPU);
+            updateStatus(`Loaded ${loadValue} from Data ${operand}`, 'running');
+            programCounter++;
+            break;
+
+        case 1: // Add
+            if (cpu === '' || cpu === null) { updateStatus('Error: CPU empty', 'error'); running=false; return false; }
+            if (operand === null || operand < 0 || operand > 9) { updateStatus('Error: Invalid operand for 1', 'error'); running=false; return false; }
+            const addValue = parseInt(data[operand]);
+            if (isNaN(addValue)) { updateStatus(`Error: Data ${operand} invalid`, 'error'); running=false; return false; }
+            await highlightTemp(() => highlightDataDesk(operand));
+            cpu += addValue;
+            await highlightTemp(highlightCPU);
+            updateStatus(`Added ${addValue}; CPU = ${cpu}`, 'running');
+            programCounter++;
+            break;
+
+        case 2: // Subtract
+            if (cpu === '' || cpu === null) { updateStatus('Error: CPU empty', 'error'); running=false; return false; }
+            if (operand === null || operand < 0 || operand > 9) { updateStatus('Error: Invalid operand for 2', 'error'); running=false; return false; }
+            const subValue = parseInt(data[operand]);
+            if (isNaN(subValue)) { updateStatus(`Error: Data ${operand} invalid`, 'error'); running=false; return false; }
+            await highlightTemp(() => highlightDataDesk(operand));
+            cpu -= subValue;
+            await highlightTemp(highlightCPU);
+            updateStatus(`Subtracted ${subValue}; CPU = ${cpu}`, 'running');
+            programCounter++;
+            break;
+
+        case 3: // Store
+            if (cpu === '' || cpu === null) { updateStatus('Error: CPU empty', 'error'); running=false; return false; }
+            if (operand === null || operand < 0 || operand > 9) { updateStatus('Error: Invalid operand for 3', 'error'); running=false; return false; }
+            await highlightTemp(highlightCPU);                     // highlight CPU
+            data[operand] = cpu.toString();
+            writeMemory();
+            highlightDataDesk(operand);                            // highlight data desk where we stored
+            await sleep(500);                                      // show it for 500ms
+            clearDataHighlights();                                 // clear the data desk highlight
+            updateStatus(`Stored CPU ${cpu} into Data ${operand}`, 'running');
+            programCounter++;
+            break;
+
+        case 4: // Jump
+            if (operand === null || operand < 0 || operand > 9) { updateStatus('Error: Invalid jump target', 'error'); running=false; return false; }
+            programCounter = operand;
+            updateStatus(`Jumped to ${operand}`, 'running');
+            break;
+
+        case 5: // Jump if zero
+            if (cpu === '' || cpu === null) { updateStatus('Error: CPU empty', 'error'); running=false; return false; }
+            if (operand < 0 || operand > 9) { updateStatus('Error: Invalid jump target', 'error'); running=false; return false; }
+            await highlightTemp(highlightCPU);
+            if (cpu === 0) { programCounter = operand; updateStatus(`CPU is 0; jumped to ${operand}`, 'running'); }
+            else { programCounter++; updateStatus(`CPU not zero; continuing`, 'running'); }
+            break;
+
+        case 6: // Jump if negative
+            if (cpu === '' || cpu === null) { updateStatus('Error: CPU empty', 'error'); running=false; return false; }
+            if (operand < 0 || operand > 9) { updateStatus('Error: Invalid jump target', 'error'); running=false; return false; }
+            await highlightTemp(highlightCPU);
+            if (cpu < 0) { programCounter = operand; updateStatus(`CPU negative; jumped to ${operand}`, 'running'); }
+            else { programCounter++; updateStatus(`CPU not negative`, 'running'); }
+            break;
+
+        case 7: // Input
+            if (inputIndex >= inputValues.length) { updateStatus('Error: No more input', 'error'); running=false; return false; }
+            const inVal = parseInt(inputValues[inputIndex]);
+            if (isNaN(inVal)) { updateStatus('Error: Invalid input', 'error'); running=false; return false; }
+            await highlightTemp(highlightInputDesk);
+            cpu = inVal;
+            inputIndex++;
+            await highlightTemp(highlightCPU);
+            updateStatus(`Read input ${cpu}`, 'running');
+            programCounter++;
+            break;
+
+        case 8: // Output
+            if (cpu === '' || cpu === null) { updateStatus('Error: CPU empty', 'error'); running=false; return false; }
+            await highlightTemp(highlightCPU);
+            await highlightTemp(highlightOutputDesk);
+            outputValues.push(cpu);
+            updateOutputDisplay();
+            updateStatus(`Output ${cpu}`, 'running');
+            programCounter++;
+            break;
+
+        case 9: // Halt
+            updateStatus('Program ended.', 'running');
+            running = false;
+            return false;
+
+        default:
+            updateStatus('Error: Unknown opcode', 'error');
+            running = false;
+            return false;
+    }
+
+    updateCPU();
+    return true;
+}
+
+// Run / Step / Reset functions
+async function run() {
+    readMemory();
+    parseInputValues();
+    running = true;
+    runBtn.disabled = true;
+    stepBtn.disabled = true;
+    loadExampleBtn.disabled = true;
+    newBtn.disabled = true;
+
+    while (running) {
+        const cont = await executeStep();
+        if (!cont) break;
+    }
+
+    runBtn.disabled = false;
+    stepBtn.disabled = false;
+    loadExampleBtn.disabled = false;
+    newBtn.disabled = false;
+}
+
+function step() {
+    readMemory();
+    parseInputValues();
+    if (!running) running = true;
+    executeStep().then(cont => {
+        if (!cont) {
+            runBtn.disabled = false;
+            stepBtn.disabled = false;
+            loadExampleBtn.disabled = false;
+            newBtn.disabled = false;
+        }
+    });
+}
+
+function reset() {
+    running = false;
+    cpu = '';
+    programCounter = 0;
+    updateCPU();
+    outputValues = [];
+    outputDesk.value = '';
+    updateStatus('Ready to run.');
+    highlightInstructionDesk(0);
+    runBtn.disabled = false;
+    stepBtn.disabled = false;
+    loadExampleBtn.disabled = false;
+    newBtn.disabled = false;
+}
+
+// Initialize
+updateCPU();
+highlightInstructionDesk(0);
+
+// Connection lines
+const svg = document.getElementById('connectionsSvg');
+
+function drawConnections() {
+    // Clear existing lines
+    svg.innerHTML = '';
+    connections = [];
+    
+    const cpuElement = document.querySelector('#cpuValue').closest('.section');
+    const cpuRect = cpuElement.getBoundingClientRect();
+    const workspaceRect = document.querySelector('.workspace').getBoundingClientRect();
+    
+    const cpuCenterX = cpuRect.left + cpuRect.width / 2 - workspaceRect.left;
+    const cpuCenterY = cpuRect.top + cpuRect.height / 2 - workspaceRect.top;
+    
+    // Connect instruction desks
+    for (let i = 0; i < 10; i++) {
+        const desk = document.getElementById(`inst${i}`);
+        if (desk) {
+            const rect = desk.getBoundingClientRect();
+            const deskCenterX = rect.left + rect.width / 2 - workspaceRect.left;
+            const deskCenterY = rect.top + rect.height / 2 - workspaceRect.top;
+            
+            const line = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            const d = `M ${deskCenterX} ${deskCenterY} Q ${(deskCenterX + cpuCenterX) / 2} ${(deskCenterY + cpuCenterY) / 2 - 30} ${cpuCenterX} ${cpuCenterY}`;
+            line.setAttribute('d', d);
+            line.setAttribute('class', 'connection-line');
+            line.setAttribute('data-desk', `inst${i}`);
+            svg.appendChild(line);
+            connections.push({ element: line, deskId: `inst${i}` });
+        }
+    }
+    
+    // Connect data desks
+    for (let i = 0; i < 10; i++) {
+        const desk = document.getElementById(`data${i}`);
+        if (desk) {
+            const rect = desk.getBoundingClientRect();
+            const deskCenterX = rect.left + rect.width / 2 - workspaceRect.left;
+            const deskCenterY = rect.top + rect.height / 2 - workspaceRect.top;
+            
+            const line = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            const d = `M ${deskCenterX} ${deskCenterY} Q ${(deskCenterX + cpuCenterX) / 2} ${(deskCenterY + cpuCenterY) / 2 + 30} ${cpuCenterX} ${cpuCenterY}`;
+            line.setAttribute('d', d);
+            line.setAttribute('class', 'connection-line');
+            line.setAttribute('data-desk', `data${i}`);
+            svg.appendChild(line);
+            connections.push({ element: line, deskId: `data${i}` });
+        }
+    }
+    
+    // Connect input desk
+    const inputSection = document.querySelector('#inputDesk').closest('.section');
+    const inputRect = inputSection.getBoundingClientRect();
+    const inputCenterX = inputRect.left + inputRect.width / 2 - workspaceRect.left;
+    const inputCenterY = inputRect.top + inputRect.height / 2 - workspaceRect.top;
+    
+    const inputLine = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    const inputD = `M ${inputCenterX} ${inputCenterY} L ${cpuCenterX} ${cpuCenterY}`;
+    inputLine.setAttribute('d', inputD);
+    inputLine.setAttribute('class', 'connection-line');
+    inputLine.setAttribute('data-desk', 'input');
+    svg.appendChild(inputLine);
+    connections.push({ element: inputLine, deskId: 'input' });
+    
+    // Connect output desk
+    const outputSection = document.querySelector('#outputDesk').closest('.section');
+    const outputRect = outputSection.getBoundingClientRect();
+    const outputCenterX = outputRect.left + outputRect.width / 2 - workspaceRect.left;
+    const outputCenterY = outputRect.top + outputRect.height / 2 - workspaceRect.top;
+    
+    const outputLine = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    const outputD = `M ${cpuCenterX} ${cpuCenterY} L ${outputCenterX} ${outputCenterY}`;
+    outputLine.setAttribute('d', outputD);
+    outputLine.setAttribute('class', 'connection-line');
+    outputLine.setAttribute('data-desk', 'output');
+    svg.appendChild(outputLine);
+    connections.push({ element: outputLine, deskId: 'output' });
+}
+
+function highlightConnection(deskId) {
+    connections.forEach(conn => {
+        if (conn.deskId === deskId) {
+            conn.element.classList.add('active');
+        } else {
+            conn.element.classList.remove('active');
+        }
+    });
+}
+
+function clearConnectionHighlights() {
+    connections.forEach(conn => {
+        conn.element.classList.remove('active');
+    });
+}
+
+// Draw connections on load and window resize
+drawConnections();
+window.addEventListener('resize', drawConnections);
+
+runBtn.addEventListener('click', run);
+stepBtn.addEventListener('click', step);
+resetBtn.addEventListener('click', reset);
+
+const loadExampleBtn = document.getElementById('loadExampleBtn');
+
+loadExampleBtn.addEventListener('click', () => {
+    const exampleInstructions = ['0 2', '5 9', '2 1', '3 2', '0 0', '8', '1 1', '3 0', '4 0', '9'];
+    const exampleData = ['1', '1', '5', '', '', '', '', '', '', ''];
+
+    // Fill instruction desks
+    document.querySelectorAll('input[data-desk^="inst"]').forEach((input, i) => {
+        input.value = exampleInstructions[i] || '';
+    });
+
+    // Fill data desks
+    document.querySelectorAll('input[data-desk^="data"]').forEach((input, i) => {
+        input.value = exampleData[i] || '';
+    });
+
+    // Update memory arrays
+    readMemory();
+
+    // Reset CPU, output, and program counter
+    cpu = '';
+    updateCPU();
+    outputValues = [];
+    outputDesk.value = '';
+    programCounter = 0;
+    highlightInstructionDesk(0, 'inst');
+
+    updateStatus('Example program loaded. Ready to run.', 'running');
+
+    runBtn.disabled = false;
+    stepBtn.disabled = false;
+    loadExampleBtn.disabled = false;
+    newBtn.disabled = false
+});
+
+
+const newBtn = document.getElementById('newBtn');
+
+newBtn.addEventListener('click', () => {
+    // Clear instruction desks
+    document.querySelectorAll('input[data-desk^="inst"]').forEach(input => {
+        input.value = '';
+    });
+
+    // Clear data desks
+    document.querySelectorAll('input[data-desk^="data"]').forEach(input => {
+        input.value = '';
+    });
+
+    // Clear memory arrays
+    instructions.fill('');
+    data.fill('');
+
+    // Reset CPU and PC
+    cpu = '';
+    programCounter = 0;
+    updateCPU();
+
+    // Clear output
+    outputValues = [];
+    outputDesk.value = '';
+
+    // Clear any error highlighting
+    document.querySelectorAll('.desk').forEach(d => d.classList.remove('error'));
+
+    // Clear status message
+    updateStatus('Ready to run.');
+
+    // Highlight first instruction desk
+    highlightInstructionDesk(0, 'inst');
+
+    // Enable step/run buttons
+    runBtn.disabled = false;
+    stepBtn.disabled = false;
+    loadExampleBtn.disabled = false;
+    newBtn.disabled = false
+});
+
+// Speed toggle button
+speedBtn.addEventListener('click', () => {
+    if (speedMode === 'normal') {
+        speedMode = 'fast';
+        speedBtn.textContent = '🐰 Fast Speed';
+        speedBtn.classList.remove('superfast', 'ultrafast');
+        speedBtn.classList.add('fast');
+    } else if (speedMode === 'fast') {
+        speedMode = 'superfast';
+        speedBtn.textContent = '🚀 Super Fast';
+        speedBtn.classList.remove('fast', 'ultrafast');
+        speedBtn.classList.add('superfast');
+    } else if (speedMode === 'superfast') {
+        speedMode = 'ultrafast';
+        speedBtn.textContent = '⚡ Ultra Fast';
+        speedBtn.classList.remove('fast', 'superfast');
+        speedBtn.classList.add('ultrafast');
+    } else {
+        speedMode = 'normal';
+        speedBtn.textContent = '🐢 Normal Speed';
+        speedBtn.classList.remove('fast', 'superfast', 'ultrafast');
+    }
+});
+
+// Bus lines toggle button
+busBtn.addEventListener('click', () => {
+    busLinesVisible = !busLinesVisible;
+    const svg = document.getElementById('connectionsSvg');
+    if (busLinesVisible) {
+        svg.classList.remove('hidden');
+        busBtn.textContent = '🔌 Hide Wires';
+        busBtn.classList.remove('hidden');
+    } else {
+        svg.classList.add('hidden');
+        busBtn.textContent = '🔌 Show Wires';
+        busBtn.classList.add('hidden');
+    }
+});
+
+
+
+
+</script>
+</body>
+</html>
